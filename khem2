@@ -1,0 +1,284 @@
+,e.renk,fs,S);
+  });
+
+  /* rüzgâr oku — kaynağın gerisinden gelir */
+  const okU=Math.min(Math.max(enUzak*0.22,60/S),130/S);
+  const bx=cx-ux*okU*1.9, by=cy-uy*okU*1.9;
+  okCiz(hKtx,bx,by,cx-ux*okU*0.55,cy-uy*okU*0.55,koyuMu()?"#EAF2FF":"#16324F",4/S,15/S);
+  const wfs=Math.max(9,12/S);
+  hKtx.font="800 "+wfs+"px system-ui";
+  const wtxt="RÜZGÂR "+sonHesap.u+" m/s";
+  const wtw=hKtx.measureText(wtxt).width;
+  etiketCiz(hKtx,bx-wtw/2,by-14/S,wtxt,koyuMu()?"#EAF2FF":"#16324F",wfs,S);
+
+  /* kaynak noktası */
+  const sr=11/S;
+  hKtx.beginPath();hKtx.arc(cx,cy,sr,0,7);
+  hKtx.fillStyle=koyuMu()?"#161F2A":"#FFFF";
+  hKtx.strokeStyle=v.renk||"#C1121F";hKtx.lineWidth=3.5/S;
+  hKtx.fill();hKtx.stroke();
+  const cr=5.5/S;
+  hKtx.strokeStyle=v.renk||"#C1121F";hKtx.lineWidth=2.6/S;
+  hKtx.beginPath();
+  hKtx.moveTo(cx-cr,cy);hKtx.lineTo(cx+cr,cy);
+  hKtx.moveTo(cx,cy-cr);hKtx.lineTo(cx,cy+cr);
+  hKtx.stroke();
+  const kfs=Math.max(9,12.5/S);
+  etiketCiz(hKtx,cx+sr+6/S,cy+kfs*0.38,`${v.duz||"?"} kaçak noktası`,v.renk||"#C1121F",kfs,S);
+}
+
+/* ════ SAĞ PANEL GÜNCELLEMELERİ ════ */
+function spSonucGuncelle(){
+  const el=document.getElementById("sp-sonuc-ic");
+  if(!el) return;
+  if(!sonHesap){
+    el.innerHTML='<div class="sp-bos">📊 Hesaplama yapılmadı.</div>';
+    return;
+  }
+  const v=KDB[sonHesap.kimyasal];
+  const enUzak=Math.max(...sonHesap.hesaplar.map(e=>e.mesafe),1);
+  let h=`<div style="display:flex;align-items:center;gap:7px;margin-bottom:7px">
+    <span style="font-size:18px;font-weight:800;color:${v.renk}">${v.duz}</span>
+    <span style="font-size:12px;color:var(--soluk)">${v.ad} · ${sonHesap.u} m/s · Sınıf ${sonHesap.sinif}</span>
+  </div>`;
+  for(const e of sonHesap.hesaplar){
+    h+=`<div class="sp-bant" style="--bk:${e.renk}">
+      <span class="ad">${e.ad} · ${e.ppm} ppm</span><span class="msf">${mYaz(e.mesafe)}</span>
+    </div>`;
+  }
+  if(sonHesap.lelMesafe!=null&&sonHesap.lelMesafe>0){
+    h+=`<div class="sp-bant" style="--bk:#2D7A46">
+      <span class="ad">LEL · %${v.lfl}</span><span class="msf">${mYaz(sonHesap.lelMesafe)}</span>
+    </div>`;
+  }
+  h+=`<button class="btn btn-ik btn-blok btn-kk" onclick="sayfaGec('sonuc')">Detaylı sonuç sayfası →</button>`;
+  el.innerHTML=h;
+  miniKanvasCiz();
+}
+
+/* ── NH₃ flaş buharlaşma notu (sağ panel) ── */
+function spFlashNot(){
+  const el=document.getElementById("sp-flash-not");
+  if(!el)return;
+  if(secKimyasal!=="NH3"||kaynak.mod==="anlik"){el.style.display="none";return;}
+  const T_id=kaynak.mod==="tank"?"nh3DepoT2":"nh3DepoT";
+  const T=parseFloat(document.getElementById(T_id)?.value)||25;
+  const f=nh3FlashFrac(T);
+  el.style.display="block";
+  el.innerHTML="❄ Depo <b>"+T+" °C</b> → flaş oranı <b>%"+(f*100).toFixed(0)+"</b> · bulut yoğunluğu ≈ <b>"+nh3BulutYog(f).toFixed(2)+" kg/m³</b> — ağır gaz modeli uygulanır.";
+}
+
+/* ── sağ panel mini harita göstergesi ── */
+function miniKanvasCiz(){
+  const c=document.getElementById("miniKanvas");
+  if(!c)return;
+  const k=c.getContext("2d");
+  const W=c.clientWidth||300,H=160;
+  c.width=W;c.height=H;
+  k.fillStyle=koyuMu()?"#1D2836":"#E8EDF0";k.fillRect(0,0,W,H);
+  k.strokeStyle=koyuMu()?"rgba(255,255,255,.07)":"rgba(20,35,55,.08)";k.lineWidth=1;
+  for(let x=0;x<W;x+=24){k.beginPath();k.moveTo(x,0);k.lineTo(x,H);k.stroke();}
+  for(let y=0;y<H;y+=24){k.beginPath();k.moveTo(0,y);k.lineTo(W,y);k.stroke();}
+  const cx=W/2,cy=H/2;
+  if(sonHesap&&sonHesap.hesaplar&&sonHesap.hesaplar.length&&sonHesap.hesaplar[0].mesafe>0){
+    const yon=sonHesap.yonDeg*Math.PI/180, rot=yon-Math.PI/2;
+    const enU=sonHesap.hesaplar[0].mesafe;
+    const R=m=>Math.max(6,m/enU*W*0.38);
+    for(let i=sonHesap.hesaplar.length-1;i>=0;i--){
+      const e=sonHesap.hesaplar[i];
+      k.beginPath();
+      k.ellipse(cx,cy,R(e.mesafe),Math.max(5,R(e.mesafe)*0.42),rot,0,Math.PI*2);
+      k.fillStyle=e.renk+(koyuMu()?"55":"44");k.fill();
+      k.strokeStyle=e.renk;k.lineWidth=1.2;k.stroke();
+    }
+    k.beginPath();k.arc(cx,cy,4,0,7);k.fillStyle=koyuMu()?"#EAF2FF":"#16324F";k.fill();
+    k.font="700 10px system-ui";k.fillStyle=koyuMu()?"#D6DEE9":"#4A5866";
+    k.fillText("plume aktif — kaynak seçimi için Harita sekmesi",8,H-8);
+  }else{
+    k.beginPath();k.arc(cx,cy,5,0,7);k.fillStyle="#E85D04";k.fill();
+    k.font="700 10px system-ui";k.fillStyle=koyuMu()?"#D6DEE9":"#4A5866";
+    k.textAlign="center";
+    k.fillText("İGSAŞ Körfez",cx,cy+20);
+    k.textAlign="left";
+    k.fillText("Canlı uydu haritası: Harita sekmesi",8,H-8);
+  }
+}
+
+/* ════ CANLI LEAFLET HARİTASI (Körfez / İGSAŞ) ════ */
+/* Referans tank (Google Earth): 40°45′07.43″K · 29°45′36.20″D → 40.752065, 29.760056 */
+const IGSAS_KONUM={ad:"İGSAŞ Körfez Tesisi",lat:40.752065,lng:29.760056};
+let liveMap=null,mapHazir=false,plumeKatman=null,secimModu=false;
+
+function mapHaritayiBaslat(){
+  if(mapHazir)return;
+  const kap=document.getElementById("liveMap");
+  if(!kap)return;
+  if(typeof L==="undefined"){
+    document.getElementById("mapStatus").textContent="⚠ Harita kütüphanesi (Leaflet CDN) yüklenemedi — çevrimdışı olabilirsiniz.";
+    return;
+  }
+  mapHazir=true;
+  liveMap=L.map("liveMap",{zoomControl:true,scaleControl:true})
+           .setView([IGSAS_KONUM.lat,IGSAS_KONUM.lng],14);
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+    {maxZoom:19,attribution:"© OpenStreetMap katkıcıları"}).addTo(liveMap);
+  L.circleMarker([IGSAS_KONUM.lat,IGSAS_KONUM.lng],
+    {radius:9,color:"#E85D04",weight:3,fillColor:"#E85D04",fillOpacity:.35})
+    .bindTooltip("<b>"+IGSAS_KONUM.ad+"</b><br>Referans tank · 40,7521°K 29,7601°D")
+    .addTo(liveMap);
+  liveMap.on("click",e=>{
+    if(!secimModu)return;
+    secimModu=false;
+    liveMap.getContainer().style.cursor="";
+    mapPlumeCiz(e.latlng);
+  });
+  setTimeout(()=>{if(liveMap)liveMap.invalidateSize();},80);
+  document.getElementById("mapStatus").textContent="Harita hazır (OpenStreetMap). Plume için: hesap yapın → Plume çiz → kaynağın yerine tıklayın.";
+}
+
+/* metre → lat/lng: xYon rüzgâr altı metre, yYan yanal metre, degToward bulutun gittiği yön (bearing) */
+function llOfset(lat,lng,xYon,yYan,degToward){
+  const th=degToward*Math.PI/180;
+  const dLat=1/111320, dLng=1/(111320*Math.max(.2,Math.cos(lat*Math.PI/180)));
+  return [lat+dLat*(xYon*Math.cos(th)-yYan*Math.sin(th)),
+          lng+dLng*(xYon*Math.sin(th)+yYan*Math.cos(th))];
+}
+
+function mapPlumeCiz(ll){
+  if(!liveMap||!sonHesap)return;
+  if(plumeKatman)liveMap.removeLayer(plumeKatman);
+  const v=KDB[sonHesap.kimyasal];
+  const yon=sonHesap.yonDeg;
+  plumeKatman=L.layerGroup().addTo(liveMap);
+  L.circleMarker(ll,{radius:7,color:v.renk,weight:3,fillColor:"#ffff",fillOpacity:1})
+    .bindTooltip("<b>"+v.duz+" kaçak noktası</b>",{permanent:true,direction:"right",offset:[8,0]})
+    .addTo(plumeKatman);
+  const esikler=sonHesap.hesaplar.filter(e=>e.mesafe>0);
+  for(let i=esikler.length-1;i>=0;i--){
+    const e=esikler[i],N=28,prof=[[0,0]];
+    for(let j=1;j<=N;j++){
+      const x=e.mesafe*j/N;
+      const[sy]=sigmalar(sonHesap.sinif,x);
+      const C=sonHesap.hafif?gaussC(sonHesap.Q,sonHesap.u,sonHesap.sinif,x)
+              :yogunGazC(sonHesap.Q,sonHesap.u,sonHesap.sinif,x,sonHesap.yog);
+      prof.push([x,C>e.mg?sy*Math.sqrt(2*Math.log(C/e.mg)):0]);
+    }
+    prof.push([e.mesafe,0]);
+    const sag=prof.map(p=>llOfset(ll.lat,ll.lng,p[0],p[1],yon));
+    const sol=[...prof].reverse().map(p=>llOfset(ll.lat,ll.lng,p[0],-p[1],yon));
+    L.polygon(sag.concat(sol),{color:e.renk,weight:1.6,fillColor:e.renk,fillOpacity:.22})
+      .bindTooltip("<b>"+e.ad+"</b> — "+mYaz(e.mesafe)+" · "+e.ppm+" ppm",{sticky:true})
+      .addTo(plumeKatman);
+  }
+  const mUz=esikler.length?esikler[0].mesafe:500;
+  L.polyline([llOfset(ll.lat,ll.lng,-mUz*.18,0,yon),llOfset(ll.lat,ll.lng,mUz*1.02,0,yon)],
+    {color:"#16324F",weight:2,dashArray:"7 6",opacity:.75}).addTo(plumeKatman);
+  try{liveMap.fitBounds(plumeKatman.getBounds(),{padding:[26,26],maxZoom:16});}catch(e){}
+  const e3=sonHesap.hesaplar[0];
+  document.getElementById("mapStatus").innerHTML=
+    "<b style='color:var(--vurgu)'>"+v.duz+"</b> bulutu çizildi · rüzgâr "+sonHesap.u+" m/s ("+sonHesap.yonKaynak+"° yönünden)"+(e3?" · "+e3.ad+" "+mYaz(e3.mesafe):"");
+}
+
+function mapTesiseOdakla(){
+  if(!mapHazir){mapHaritayiBaslat();return;}
+  liveMap.flyTo([IGSAS_KONUM.lat,IGSAS_KONUM.lng],16,{duration:.8});
+}
+function mapPlumeBaslat(){
+  if(!sonHesap||!sonHesap.hesaplar||!sonHesap.hesaplar.length){
+    alert("Önce dağılım hesabı yapın: Kimyasal → Kaynak → Atmosfer.");
+    sayfaGec("atmosfer");return;
+  }
+  if(!mapHazir){mapHaritayiBaslat();if(!liveMap)return;}
+  secimModu=true;
+  liveMap.getContainer().style.cursor="crosshair";
+  document.getElementById("mapStatus").textContent="⚠ Salım kaynağının haritadaki yerine tıklayın.";
+}
+function mapPlumeTemizle(){
+  secimModu=false;
+  if(liveMap){
+    liveMap.getContainer().style.cursor="";
+    if(plumeKatman){liveMap.removeLayer(plumeKatman);plumeKatman=null;}
+  }
+  document.getElementById("mapStatus").textContent="Temizlendi. Yeni plume için 'Plume çiz' + haritaya tıklayın.";
+}
+
+/* ════ CANLI HAVA DURUMU — Open-Meteo (anahtar gerektirmez, CORS açık) ════ */
+let havaSon=null,havaCekiliyor=false;
+const WMO={0:"Açık",1:"Az bulutlu",2:"Parçalı bulutlu",3:"Kapalı",45:"Puslu",48:"Kırağılı puslu",
+  51:"Hafif çiseleme",53:"Çiseleme",55:"Yoğun çiseleme",56:"Donan çiseleme",57:"Donan yoğun çiseleme",
+  61:"Hafif yağmur",63:"Yağmurlu",65:"Şiddetli yağmur",66:"Donan yağmur",67:"Şiddetli donan yağmur",
+  71:"Hafif kar",73:"Kar yağışlı",75:"Yoğun kar",77:"Kar taneleri",
+  80:"Hafif sağanak",81:"Sağanak yağış",82:"Şiddetli sağanak",85:"Hafif kar sağanağı",86:"Kar sağanağı",
+  95:"Gök gürültülü fırtına",96:"Dolulu fırtına",99:"Şiddetli dolulu fırtına"};
+
+async function havaDurumunuGetir(){
+  if(havaCekiliyor)return;
+  havaCekiliyor=true;
+  const st=document.getElementById("havaDurum");
+  const btn=document.getElementById("havaYenileBtn");
+  if(st)st.textContent="📡 Körfez için güncel ölçüm alınıyor…";
+  if(btn)btn.disabled=true;
+  try{
+    const q="https://api.open-meteo.com/v1/forecast?latitude="+IGSAS_KONUM.lat+"&longitude="+IGSAS_KONUM.lng+
+      "&current=temperature_2m,apparent_temperature,relative_humidity_2m,precipitation,weather_code,"+
+      "cloud_cover,pressure_msl,wind_speed_10m,wind_direction_10m,wind_gusts_10m&timezone=auto";
+    const r=await fetch(q);
+    if(!r.ok)throw new Error("HTTP "+r.status);
+    const d=await r.json();
+    if(!d.current)throw new Error("boş veri");
+    havaSon=d.current;
+    havaPanelDoldur(havaSon);
+    if(st)st.textContent="✅ Canlı veri alındı — değerleri dağılım modeline aktarabilirsiniz.";
+  }catch(h){
+    if(st)st.textContent="⚠ Hava verisi alınamadı (çevrimdışı olabilirsiniz). Girdileri Atmosfer sekmesinde elle girin.";
+  }finally{
+    havaCekiliyor=false;
+    if(btn)btn.disabled=false;
+  }
+}
+
+function havaPanelDoldur(c){
+  const ana=document.getElementById("havaAnaDeger");
+  const mtr=document.getElementById("havaMetrikler");
+  const zm=document.getElementById("havaZaman");
+  const tas=(c.wind_speed_10m??0).toFixed(1), yonD=Math.round(c.wind_direction_10m??0);
+  if(ana)ana.innerHTML=
+    '<div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">'+
+      '<div class="hava-sicak">'+Math.round(c.temperature_2m)+"°C</div>"+
+      '<div><div style="font-weight:700;font-size:14px">'+(WMO[c.weather_code]??"—")+"</div>"+
+      '<div style="font-size:12px;color:var(--soluk)">Hissedilen '+Math.round(c.apparent_temperature??c.temperature_2m)+"°C</div></div>"+
+    "</div>";
+  if(mtr)mtr.innerHTML=
+    '<div><span class="etiket">Rüzgâr</span><span class="deger">'+tas+' m/s</span></div>'+
+    '<div><span class="etiket">Yön</span><span class="deger">'+yonD+'°</span></div>'+
+    '<div><span class="etiket">Hamle</span><span class="deger">'+(c.wind_gusts_10m??0).toFixed(0)+' m/s</span></div>'+
+    '<div><span class="etiket">Nem</span><span class="deger">%'+(c.relative_humidity_2m??0)+"</span></div>"+
+    '<div><span class="etiket">Basınç</span><span class="deger">'+Math.round(c.pressure_msl??0)+' hPa</span></div>'+
+    '<div><span class="etiket">Bulut</span><span class="deger">%'+(c.cloud_cover??0)+"</span></div>";
+  if(zm)zm.innerHTML="Open-Meteo · ölçüm: "+(c.time??"—").replace("T"," ")+" (yerel saat) · Körfez/Kocaeli · 10 m rüzgâr"+
+    ' <button class="btn btn-ik btn-kk" style="margin-left:6px" onclick="havaModeliAktar()">Değerleri atmosfer modeline aktar →</button>';
+}
+
+function havaModeliAktar(){
+  if(!havaSon){alert("Önce hava verisini çekin.");return;}
+  const r=document.getElementById("aRuz"),y=document.getElementById("aYon");
+  if(r)r.value=Math.max(.5,havaSon.wind_speed_10m??3).toFixed(1);
+  if(y)y.value=Math.round(havaSon.wind_direction_10m??270);
+  adimGoster();
+  sayfaGec("atmosfer");
+}
+
+/* ════ BAŞLANGIÇ ════ */
+document.addEventListener("DOMContentLoaded",()=>{
+  kmGridYap();
+  adimGoster();
+  gecmisListeYenile();
+  senaryoListeCiz();
+  miniKanvasCiz();
+  havaDurumunuGetir();  /* canlı hava — ilk yüklemede çekilir */
+  const kd=document.getElementById("sp-kalib-dur");
+  if(kd)kd.textContent="Canlı harita: OpenStreetMap · yakınlaştırma/kaydırma aktif";
+});
+</script>
+</body>
+</html>
